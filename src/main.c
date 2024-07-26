@@ -3,7 +3,7 @@
 
 #define MAX_SPEED 200.0f
 #define ACCELARATION 200.0f
-#define FRICTION 1.0f
+#define FRICTION 0.97f
 
 typedef struct sumo {
   Vector2 pos;
@@ -24,116 +24,97 @@ sumo playerOne;
 sumo playerTwo;
 ring dojo;
 
-void updatePlayer();
+void updatePlayer(float delta, sumo *player);
 void ballCrash(Vector2 v1, Vector2 v2, float m1, float m2, Vector2 x1, Vector2 x2);
+void playerInputs();
+void cpuInputs();
 
 int main(void) {
-  InitWindow(800, 800, "test");
+  int winner = 0;
+  InitWindow(800, 800, "Sumo Prime Time");
   SetTargetFPS(60);
-  playerOne.pos = (Vector2){200.0, 400.0};
-  playerOne.vol = (Vector2){300.0, 200.0};
+  playerOne.pos = (Vector2){300.0, 400.0};
+  playerOne.vol = (Vector2){0.0, 0.0};
   playerOne.accel = (Vector2){0.0, 0.0};
-  playerOne.mass = 150.0;
-  playerOne.r = 100.0;
+  playerOne.mass = 500.0;
+  playerOne.r = 50.0;
   playerOne.color = GREEN;
-  playerTwo.pos = (Vector2){600, 425};
-  playerTwo.vol = (Vector2){-200.0, -500.0};
+  playerTwo.pos = (Vector2){500, 400};
+  playerTwo.vol = (Vector2){0.0, 0.0};
   playerTwo.accel = (Vector2){0.0, 0.0};
-  playerTwo.mass = 100.0;
-  playerTwo.r = 75.0;
+  playerTwo.mass = 500.0;
+  playerTwo.r = 50.0;
   playerTwo.color = BLUE;
   dojo.pos = (Vector2){400, 400};
-  dojo.r = 300.0;
-  dojo.color = RED;
+  dojo.r = 275.0;
+  dojo.color = DARKGRAY;
 
   while (!WindowShouldClose()) {
-    updatePlayer();
+    float deltaTime = GetFrameTime();
+    if (winner == 0) {
+      playerInputs();
+      cpuInputs();
+    }
+    updatePlayer(deltaTime, &playerOne);
+    updatePlayer(deltaTime, &playerTwo);
+    if (CheckCollisionCircles(playerOne.pos, playerOne.r, playerTwo.pos, playerTwo.r)) {
+      ballCrash(playerOne.vol, playerTwo.vol, playerOne.mass, playerTwo.mass, playerOne.pos, playerTwo.pos);
+    }
+    playerOne.pos = Vector2Add(playerOne.pos, (Vector2){playerOne.vol.x * deltaTime, playerOne.vol.y * deltaTime});
+    playerTwo.pos = Vector2Add(playerTwo.pos, (Vector2){playerTwo.vol.x * deltaTime, playerTwo.vol.y * deltaTime});
+
+    if (!CheckCollisionCircles(playerOne.pos, playerOne.r, dojo.pos, dojo.r - (playerOne.r * 2) + 10) && winner == 0) {
+      winner = 2;
+    }
+    if (!CheckCollisionCircles(playerTwo.pos, playerTwo.r, dojo.pos, dojo.r - (playerTwo.r * 2) + 10) && winner == 0) {
+      winner = 1;
+    }
+
     // draw shit
     BeginDrawing();
     ClearBackground(GRAY);
-    // DrawCircleV(dojo.pos, dojo.r, dojo.color);
+    DrawCircleV(dojo.pos, dojo.r, dojo.color);
     DrawCircleV(playerOne.pos, playerOne.r, playerOne.color);
     DrawCircleV(playerTwo.pos, playerTwo.r, playerTwo.color);
-    DrawText(TextFormat("ball one velocity X: %f", playerOne.vol.x), 10, 40, 20, LIGHTGRAY);
-    DrawText(TextFormat("ball one velocity Y: %f", playerOne.vol.y), 10, 70, 20, LIGHTGRAY);
-    DrawText(TextFormat("ball two velocity X: %f", playerTwo.vol.x), 10, 100, 20, LIGHTGRAY);
-    DrawText(TextFormat("ball two velocity Y: %f", playerTwo.vol.y), 10, 130, 20, LIGHTGRAY);
+    // DrawText(TextFormat("ball one velocity X: %f", playerOne.vol.x), 10, 40, 20, LIGHTGRAY);
+    // DrawText(TextFormat("ball one velocity Y: %f", playerOne.vol.y), 10, 70, 20, LIGHTGRAY);
+    // DrawText(TextFormat("ball two velocity X: %f", playerTwo.vol.x), 10, 100, 20, LIGHTGRAY);
+    // DrawText(TextFormat("ball two velocity Y: %f", playerTwo.vol.y), 10, 130, 20, LIGHTGRAY);
+    if (winner != 0) {
+      DrawText(TextFormat("PLAYER %d WINS", winner), 80, 350, 80, LIGHTGRAY);
+    }
     EndDrawing();
   }
   CloseWindow();
   return 0;
 }
 
-void updatePlayer() {
-  float deltaTime = GetFrameTime();
-  /*
-  if (IsKeyDown(KEY_S)) {
-    playerOne.accel.x = -ACCELARATION;
-  }
-  if (IsKeyDown(KEY_F)) {
-    playerOne.accel.x = ACCELARATION;
-  }
-  if (IsKeyDown(KEY_E)) {
-    playerOne.accel.y = -ACCELARATION;
-  }
-  if (IsKeyDown(KEY_D)) {
-    playerOne.accel.y = ACCELARATION;
-  }
-  */
+void updatePlayer(float delta, sumo *player) {
   // add ball on ball collision
-  if ((playerOne.pos.x + playerOne.r) > 800 || (playerOne.pos.x - playerOne.r) < 0) {
-    playerOne.vol.x *= -1;
+  if ((player->pos.x + player->r) > 800 || (player->pos.x - player->r) < 0) {
+    player->vol.x *= -1;
   }
-  if ((playerOne.pos.y + playerOne.r) > 800 || (playerOne.pos.y - playerOne.r) < 0) {
-    playerOne.vol.y *= -1;
+  if ((player->pos.y + player->r) > 800 || (player->pos.y - player->r) < 0) {
+    player->vol.y *= -1;
   }
-  playerOne.vol = Vector2Add(playerOne.vol, (Vector2){playerOne.accel.x * deltaTime, playerOne.accel.y * deltaTime});
-  playerOne.pos = Vector2Add(playerOne.pos, (Vector2){playerOne.vol.x * deltaTime, playerOne.vol.y * deltaTime});
+  player->vol = Vector2Add(player->vol, (Vector2){player->accel.x * delta, player->accel.y * delta});
+  player->vol = Vector2Scale(player->vol, FRICTION);
 
-  if ((playerTwo.pos.x + playerTwo.r) > 800 || (playerTwo.pos.x - playerTwo.r) < 0) {
-    playerTwo.vol.x *= -1;
+  if (player->vol.x > -0.5 && player->vol.x < 0.5) {
+    player->vol.x = 0.0;
   }
-  if ((playerTwo.pos.y + playerTwo.r) > 800 || (playerTwo.pos.y - playerTwo.r) < 0) {
-    playerTwo.vol.y *= -1;
+  if (player->vol.y > -0.5 && player->vol.y < 0.5) {
+    player->vol.y = 0.0;
   }
-  playerTwo.vol = Vector2Add(playerTwo.vol, (Vector2){playerTwo.accel.x * deltaTime, playerTwo.accel.y * deltaTime});
-  playerTwo.pos = Vector2Add(playerTwo.pos, (Vector2){playerTwo.vol.x * deltaTime, playerTwo.vol.y * deltaTime});
-  if (Vector2Distance(playerOne.pos, playerTwo.pos) < (playerOne.r + playerTwo.r)) {
-    ballCrash(playerOne.vol, playerTwo.vol, playerOne.mass, playerTwo.mass, playerOne.pos, playerTwo.pos);
-    playerOne.pos = Vector2Add(playerOne.pos, (Vector2){playerOne.vol.x * deltaTime, playerOne.vol.y * deltaTime});
-    playerTwo.pos = Vector2Add(playerTwo.pos, (Vector2){playerTwo.vol.x * deltaTime, playerTwo.vol.y * deltaTime});
-    return;
+  if (player->vol.x > MAX_SPEED) {
+    player->vol.x = MAX_SPEED;
   }
-  /*
-  if (playerOne.vol.x > MAX_SPEED) {
-    playerOne.vol.x = MAX_SPEED;
+  if (player->vol.x < -MAX_SPEED) {
+    player->vol.x = -MAX_SPEED;
   }
-  if (playerOne.vol.x < -MAX_SPEED) {
-    playerOne.vol.x = -MAX_SPEED;
-  }
-  if (playerOne.vol.x > 0.5) {
-    playerOne.vol.x -= FRICTION;
-  } else if (playerOne.vol.x < 0.5) {
-    playerOne.vol.x += FRICTION;
-  } else {
-    playerOne.vol.x = 0.0;
-  }
-  if (playerOne.vol.y > MAX_SPEED) {
-    playerOne.vol.y = MAX_SPEED;
-  }
-  if (playerOne.vol.y < -MAX_SPEED) {
-    playerOne.vol.y = -MAX_SPEED;
-  }
-  if (playerOne.vol.y > 0.5) {
-    playerOne.vol.y -= FRICTION;
-  } else if (playerOne.vol.y < 0.5) {
-    playerOne.vol.y += FRICTION;
-  } else {
-    playerOne.vol.y = 0.0;
-  }
-  playerOne.accel = (Vector2){0.0, 0.0};
-  */
+  player->accel = (Vector2){0.0, 0.0};
 }
+
 void ballCrash(Vector2 v1, Vector2 v2, float m1, float m2, Vector2 x1, Vector2 x2) {
   float fDistance = Vector2Distance(x1, x2);
   // Normal
@@ -147,4 +128,36 @@ void ballCrash(Vector2 v1, Vector2 v2, float m1, float m2, Vector2 x1, Vector2 x
   playerOne.vol.y = playerOne.vol.y - p * m2 * ny;
   playerTwo.vol.x = playerTwo.vol.x + p * m1 * nx;
   playerTwo.vol.y = playerTwo.vol.y + p * m1 * ny;
+}
+
+void playerInputs() {
+  if (IsKeyDown(KEY_S)) {
+    playerOne.accel.x = -ACCELARATION;
+  }
+  if (IsKeyDown(KEY_F)) {
+    playerOne.accel.x = ACCELARATION;
+  }
+  if (IsKeyDown(KEY_E)) {
+    playerOne.accel.y = -ACCELARATION;
+  }
+  if (IsKeyDown(KEY_D)) {
+    playerOne.accel.y = ACCELARATION;
+  }
+}
+void cpuInputs() {
+  if (GetRandomValue(0, 100) > 50) {
+    return;
+  }
+  if (playerOne.pos.x < playerTwo.pos.x) {
+    playerTwo.accel.x = -ACCELARATION;
+  }
+  if (playerOne.pos.x > playerTwo.pos.x) {
+    playerTwo.accel.x = ACCELARATION;
+  }
+  if (playerOne.pos.y < playerTwo.pos.y) {
+    playerTwo.accel.y = -ACCELARATION;
+  }
+  if (playerOne.pos.y > playerTwo.pos.y) {
+    playerTwo.accel.y = ACCELARATION;
+  }
 }
