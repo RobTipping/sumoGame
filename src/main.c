@@ -5,6 +5,15 @@
 #define ACCELARATION 200.0f
 #define FRICTION 0.97f
 
+typedef struct sumoFist {
+  Vector2 pos;
+  Vector2 vol;
+  Vector2 accel;
+  float mass;
+  float r;
+  Color color;
+} sumoFist;
+
 typedef struct sumo {
   Vector2 pos;
   Vector2 vol;
@@ -12,6 +21,7 @@ typedef struct sumo {
   float mass;
   float r;
   Color color;
+  sumoFist fist;
 } sumo;
 
 typedef struct ring {
@@ -33,12 +43,23 @@ int main(void) {
   int winner = 0;
   InitWindow(800, 800, "Sumo Prime Time");
   SetTargetFPS(60);
+
+  // player one
   playerOne.pos = (Vector2){300.0, 400.0};
   playerOne.vol = (Vector2){0.0, 0.0};
   playerOne.accel = (Vector2){0.0, 0.0};
   playerOne.mass = 500.0;
   playerOne.r = 50.0;
   playerOne.color = GREEN;
+
+  playerOne.fist.pos = (Vector2){300.0, 400.0};
+  playerOne.fist.vol = (Vector2){0.0, 0.0};
+  playerOne.fist.accel = (Vector2){0.0, 0.0};
+  playerOne.fist.mass = 500.0;
+  playerOne.fist.r = 10.0;
+  playerOne.fist.color = DARKGREEN;
+
+  // player two
   playerTwo.pos = (Vector2){500, 400};
   playerTwo.vol = (Vector2){0.0, 0.0};
   playerTwo.accel = (Vector2){0.0, 0.0};
@@ -69,14 +90,16 @@ int main(void) {
     if (!CheckCollisionCircles(playerTwo.pos, playerTwo.r, dojo.pos, dojo.r - (playerTwo.r * 2) + 10) && winner == 0) {
       winner = 1;
     }
+    float temp = Vector2Angle(playerTwo.pos, playerOne.pos);
 
     // draw shit
     BeginDrawing();
     ClearBackground(GRAY);
     DrawCircleV(dojo.pos, dojo.r, dojo.color);
     DrawCircleV(playerOne.pos, playerOne.r, playerOne.color);
+    DrawCircleV(playerOne.fist.pos, playerOne.fist.r, playerOne.fist.color);
     DrawCircleV(playerTwo.pos, playerTwo.r, playerTwo.color);
-    // DrawText(TextFormat("ball one velocity X: %f", playerOne.vol.x), 10, 40, 20, LIGHTGRAY);
+    DrawText(TextFormat("angle between players: %f", temp), 10, 40, 20, LIGHTGRAY);
     // DrawText(TextFormat("ball one velocity Y: %f", playerOne.vol.y), 10, 70, 20, LIGHTGRAY);
     // DrawText(TextFormat("ball two velocity X: %f", playerTwo.vol.x), 10, 100, 20, LIGHTGRAY);
     // DrawText(TextFormat("ball two velocity Y: %f", playerTwo.vol.y), 10, 130, 20, LIGHTGRAY);
