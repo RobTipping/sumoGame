@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include "raylib.h"
 #include "raymath.h"
 
@@ -90,7 +92,10 @@ int main(void) {
     if (!CheckCollisionCircles(playerTwo.pos, playerTwo.r, dojo.pos, dojo.r - (playerTwo.r * 2) + 10) && winner == 0) {
       winner = 1;
     }
-    float temp = Vector2Angle(playerTwo.pos, playerOne.pos);
+    Vector2 temp = Vector2Subtract(playerOne.pos, playerTwo.pos);
+    float angelbetween = atan(temp.y / temp.x);
+    Vector2 tempPos = {(playerOne.r * sin(angelbetween)), (playerOne.r * cos(angelbetween))};
+    tempPos = Vector2Add(tempPos, playerOne.pos);
 
     // draw shit
     BeginDrawing();
@@ -99,7 +104,9 @@ int main(void) {
     DrawCircleV(playerOne.pos, playerOne.r, playerOne.color);
     DrawCircleV(playerOne.fist.pos, playerOne.fist.r, playerOne.fist.color);
     DrawCircleV(playerTwo.pos, playerTwo.r, playerTwo.color);
-    DrawText(TextFormat("angle between players: %f", temp), 10, 40, 20, LIGHTGRAY);
+    DrawLineV(playerOne.pos, tempPos, BLACK);
+    DrawText(TextFormat("player distance x: %f", temp.x), 10, 10, 20, LIGHTGRAY);
+    DrawText(TextFormat("player sidtance y: %f", temp.y), 10, 40, 20, LIGHTGRAY);
     // DrawText(TextFormat("ball one velocity Y: %f", playerOne.vol.y), 10, 70, 20, LIGHTGRAY);
     // DrawText(TextFormat("ball two velocity X: %f", playerTwo.vol.x), 10, 100, 20, LIGHTGRAY);
     // DrawText(TextFormat("ball two velocity Y: %f", playerTwo.vol.y), 10, 130, 20, LIGHTGRAY);
