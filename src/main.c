@@ -8,14 +8,22 @@
 #define FIST_ACCELARATION 1000.0f
 #define FRICTION 0.97f
 
-typedef struct sumo {
-  Vector2 pos;
+typedef struct ball {
+  Vector2 homePos;
+  Vector2 realPos;
+  Vector2 direction;
   Vector2 vol;
   Vector2 accel;
   float mass;
   float r;
   Color color;
+} ball;
+
+typedef struct sumo {
+  ball body;
   bool slapping;
+  ball fistR;
+  ball fistL;
 } sumo;
 
 typedef struct ring {
@@ -26,7 +34,7 @@ typedef struct ring {
 
 sumo playerOne;
 sumo playerTwo;
-sumo fistPlayerOne;
+sumo fistPlayerOne;  // will get replaced by fist
 
 ring dojo;
 
@@ -40,11 +48,12 @@ Vector2 tempPuchVol;
 double gameTime;
 double slapStartTime;
 
-void updatePlayer(float delta, sumo* player);
-void ballCrash(sumo* a, sumo* b);
+void updatePlayer(float delta, ball* player);
+void ballCrash(ball* a, ball* b);
 void playerInputs();
 void cpuInputs();
 void fistInputs();
+void fistUpdate(sumo* a);
 
 int main(void) {
   int winner = 0;
@@ -52,59 +61,44 @@ int main(void) {
   SetTargetFPS(60);
 
   // player one
-  playerOne.pos = (Vector2){500.0, 400.0};
-  playerOne.vol = (Vector2){0.0, 0.0};
-  playerOne.accel = (Vector2){0.0, 0.0};
-  playerOne.mass = 500.0;
-  playerOne.r = 50.0;
-  playerOne.color = GREEN;
+  playerOne.body.realPos = (Vector2){500.0, 400.0};
+  playerOne.body.vol = (Vector2){0.0, 0.0};
+  playerOne.body.accel = (Vector2){0.0, 0.0};
+  playerOne.body.mass = 500.0;
+  playerOne.body.r = 50.0;
+  playerOne.body.color = GREEN;
   playerOne.slapping = false;
 
-  fistPlayerOne.pos = (Vector2){300.0, 400.0};
-  fistPlayerOne.vol = (Vector2){0.0, 0.0};
-  fistPlayerOne.accel = (Vector2){0.0, 0.0};
-  fistPlayerOne.mass = 1000.0;
-  fistPlayerOne.r = 10.0;
-  fistPlayerOne.color = DARKGREEN;
+  playerOne.fistL.realPos = (Vector2){300.0, 400.0};
+  playerOne.fistL.vol = (Vector2){0.0, 0.0};
+  playerOne.fistL.accel = (Vector2){0.0, 0.0};
+  playerOne.fistL.mass = 500.0;
+  playerOne.fistL.r = 20.0;
+  playerOne.fistL.color = DARKGREEN;
+
+  playerOne.fistR.realPos = (Vector2){300.0, 400.0};
+  playerOne.fistR.vol = (Vector2){0.0, 0.0};
+  playerOne.fistR.accel = (Vector2){0.0, 0.0};
+  playerOne.fistR.mass = 500.0;
+  playerOne.fistR.r = 20.0;
+  playerOne.fistR.color = DARKPURPLE;
 
   // player two
-  playerTwo.pos = (Vector2){300, 300};
-  playerTwo.vol = (Vector2){0.0, 0.0};
-  playerTwo.accel = (Vector2){0.0, 0.0};
-  playerTwo.mass = 500.0;
-  playerTwo.r = 50.0;
-  playerTwo.color = BLUE;
+  playerTwo.body.realPos = (Vector2){300, 300};
+  playerTwo.body.vol = (Vector2){0.0, 0.0};
+  playerTwo.body.accel = (Vector2){0.0, 0.0};
+  playerTwo.body.mass = 500.0;
+  playerTwo.body.r = 50.0;
+  playerTwo.body.color = BLUE;
+
   dojo.pos = (Vector2){400, 400};
   dojo.r = 275.0;
   dojo.color = DARKGRAY;
 
-  temp = Vector2Subtract(playerTwo.pos, playerOne.pos);
-  float angelbetween = atan(-temp.y / temp.x);
-  float fistAngle = angelbetween + 0.785398;
-  if (temp.x < 0) {
-    punchVector = (Vector2){-(playerOne.r * cos(angelbetween)), (playerOne.r * sin(angelbetween))};
-    fistPlayerOne.pos = (Vector2){-(playerOne.r * cos(fistAngle)), (playerOne.r * sin(fistAngle))};
-  } else {
-    punchVector = (Vector2){(playerOne.r * cos(angelbetween)), -(playerOne.r * sin(angelbetween))};
-    fistPlayerOne.pos = (Vector2){(playerOne.r * cos(fistAngle)), -(playerOne.r * sin(fistAngle))};
-  }
-  tempPos = Vector2Add(playerOne.pos, punchVector);
-  fistPlayerOne.pos = Vector2Add(playerOne.pos, fistPlayerOne.pos);
-  /*
-  Vector2 angleMid = (Vector2){400, 400};
-  Vector2 angleOne = (Vector2){200, 200};
-  Vector2 angleTwo = (Vector2){200, 600};
-  Vector2 angleThree = (Vector2){600, 200};
-  Vector2 angleFour = (Vector2){600, 600};
-  Vector2 distanceOne = Vector2Subtract(angleOne, angleMid);
-  Vector2 distanceTwo = Vector2Subtract(angleTwo, angleMid);
-  Vector2 distanceThree = Vector2Subtract(angleThree, angleMid);
-  Vector2 distanceFour = Vector2Subtract(angleFour, angleMid);
-  float angleBetweenOne = atan(-distanceOne.y / distanceOne.x);
-  float angleBetweenTwo = atan(-distanceTwo.y / distanceTwo.x);
-  float angleBetweenThree = atan(-distanceThree.y / distanceThree.x);
-  float angleBetweenFour = atan(-distanceFour.y / distanceFour.x);
-  */
+  // setting up fist!
+  fistUpdate(&playerOne);
+  playerOne.fistL.realPos = playerOne.fistL.homePos;
+  playerOne.fistR.realPos = playerOne.fistR.homePos;
 
   while (!WindowShouldClose()) {
     gameTime = GetTime();
@@ -114,61 +108,48 @@ int main(void) {
       playerInputs();
       cpuInputs();
     }
-    updatePlayer(deltaTime, &playerOne);
-    updatePlayer(deltaTime, &playerTwo);
-    updatePlayer(deltaTime, &fistPlayerOne);
-    if (CheckCollisionCircles(playerOne.pos, playerOne.r, playerTwo.pos, playerTwo.r)) {
-      ballCrash(&playerOne, &playerTwo);
+    updatePlayer(deltaTime, &playerOne.body);
+    updatePlayer(deltaTime, &playerTwo.body);
+    updatePlayer(deltaTime, &playerOne.fistL);
+    updatePlayer(deltaTime, &playerOne.fistR);
+    if (CheckCollisionCircles(playerOne.body.realPos, playerOne.body.r, playerTwo.body.realPos, playerTwo.body.r)) {
+      ballCrash(&playerOne.body, &playerTwo.body);
     }
-    if (CheckCollisionCircles(fistPlayerOne.pos, fistPlayerOne.r, playerTwo.pos, playerTwo.r)) {
-      ballCrash(&fistPlayerOne, &playerTwo);
+    if (CheckCollisionCircles(playerOne.fistL.realPos, playerOne.fistL.r, playerTwo.body.realPos, playerTwo.body.r)) {
+      ballCrash(&playerOne.fistL, &playerTwo.body);
     }
-    playerOne.pos = Vector2Add(playerOne.pos, (Vector2){playerOne.vol.x * deltaTime, playerOne.vol.y * deltaTime});
-    fistPlayerOne.pos = Vector2Add(fistPlayerOne.pos, (Vector2){fistPlayerOne.vol.x * deltaTime, fistPlayerOne.vol.y * deltaTime});
-    fistPlayerOne.vol = Vector2Scale(fistPlayerOne.vol, 0.9);
-    playerTwo.pos = Vector2Add(playerTwo.pos, (Vector2){playerTwo.vol.x * deltaTime, playerTwo.vol.y * deltaTime});
+    if (CheckCollisionCircles(playerOne.fistR.realPos, playerOne.fistR.r, playerTwo.body.realPos, playerTwo.body.r)) {
+      ballCrash(&playerOne.fistR, &playerTwo.body);
+    }
+    playerOne.body.realPos = Vector2Add(playerOne.body.realPos, (Vector2){playerOne.body.vol.x * deltaTime, playerOne.body.vol.y * deltaTime});
+    playerOne.fistL.realPos = Vector2Add(playerOne.fistL.realPos, (Vector2){playerOne.fistL.vol.x * deltaTime, playerOne.fistL.vol.y * deltaTime});
+    playerOne.fistL.vol = Vector2Scale(playerOne.fistL.vol, 0.9);
+    playerOne.fistR.realPos = Vector2Add(playerOne.fistR.realPos, (Vector2){playerOne.fistR.vol.x * deltaTime, playerOne.fistR.vol.y * deltaTime});
+    playerOne.fistR.vol = Vector2Scale(playerOne.fistR.vol, 0.9);
+    playerTwo.body.realPos = Vector2Add(playerTwo.body.realPos, (Vector2){playerTwo.body.vol.x * deltaTime, playerTwo.body.vol.y * deltaTime});
 
-    if (!CheckCollisionCircles(playerOne.pos, playerOne.r, dojo.pos, dojo.r - (playerOne.r * 2) + 10) && winner == 0) {
+    if (!CheckCollisionCircles(playerOne.body.realPos, playerOne.body.r, dojo.pos, dojo.r - (playerOne.body.r * 2) + 10) && winner == 0) {
       winner = 2;
     }
-    if (!CheckCollisionCircles(playerTwo.pos, playerTwo.r, dojo.pos, dojo.r - (playerTwo.r * 2) + 10) && winner == 0) {
+    if (!CheckCollisionCircles(playerTwo.body.realPos, playerTwo.body.r, dojo.pos, dojo.r - (playerTwo.body.r * 2) + 10) && winner == 0) {
       winner = 1;
     }
-    temp = Vector2Subtract(playerTwo.pos, playerOne.pos);
-    float angelbetween = atan(-temp.y / temp.x);
-    float fistAngle = angelbetween + 0.785398;
-    if (temp.x < 0) {
-      punchVector = (Vector2){-(playerOne.r * cos(angelbetween)), (playerOne.r * sin(angelbetween))};
-      fistGetToo = (Vector2){-(playerOne.r * cos(fistAngle)), (playerOne.r * sin(fistAngle))};
-      slapDirection = (Vector2){-(playerOne.r * 2 * cos(fistAngle)), (playerOne.r * sin(fistAngle))};
-    } else {
-      punchVector = (Vector2){(playerOne.r * cos(angelbetween)), -(playerOne.r * sin(angelbetween))};
-      fistGetToo = (Vector2){(playerOne.r * cos(fistAngle)), -(playerOne.r * sin(fistAngle))};
-      slapDirection = (Vector2){(playerOne.r * 2 * cos(fistAngle)), -(playerOne.r * sin(fistAngle))};
-    }
-    tempPos = Vector2Add(playerOne.pos, punchVector);
-    fistGetToo = Vector2Add(playerOne.pos, fistGetToo);
-    slapDirection = Vector2Add(playerOne.pos, slapDirection);
-    //  tempPos.y -= (tempPos.y - playerOne.pos.y) * 2;
+
+    //  // new fist pos
+    fistUpdate(&playerOne);
 
     // draw shit
     BeginDrawing();
     ClearBackground(GRAY);
     DrawCircleV(dojo.pos, dojo.r, dojo.color);
-    DrawCircleV(playerOne.pos, playerOne.r, playerOne.color);
-    DrawCircleV(fistPlayerOne.pos, fistPlayerOne.r, fistPlayerOne.color);
-    DrawCircleV(playerTwo.pos, playerTwo.r, playerTwo.color);
-    DrawLineV(playerOne.pos, tempPos, BLACK);
-    DrawText(TextFormat("player distance x: %f", temp.x), 10, 10, 20, LIGHTGRAY);
-    DrawText(TextFormat("player sidtance y: %f", temp.y), 10, 40, 20, LIGHTGRAY);
-    DrawText(TextFormat("angle: %f", angelbetween), 10, 70, 20, LIGHTGRAY);
-    DrawText(TextFormat("punchVector X: %f", punchVector.x), 10, 100, 20, LIGHTGRAY);
-    DrawText(TextFormat("punchVector Y: %f", punchVector.y), 10, 130, 20, LIGHTGRAY);
-    DrawText(TextFormat("punchvol X: %f", tempPuchVol.x), 10, 160, 20, LIGHTGRAY);
-    DrawText(TextFormat("punchvol Y: %f", tempPuchVol.y), 10, 190, 20, LIGHTGRAY);
+    DrawCircleV(playerOne.body.realPos, playerOne.body.r, playerOne.body.color);
+    DrawCircleV(playerOne.fistL.realPos, playerOne.fistL.r, playerOne.fistL.color);
+    DrawCircleV(playerOne.fistR.realPos, playerOne.fistR.r, playerOne.fistR.color);
+    DrawCircleV(playerTwo.body.realPos, playerTwo.body.r, playerTwo.body.color);
+    DrawLineV(playerOne.body.realPos, playerOne.body.direction, BLACK);
     DrawText(TextFormat("time: %f", gameTime), 10, 220, 20, LIGHTGRAY);
-    // DrawText(TextFormat("ball two velocity X: %f", playerTwo.vol.x), 10, 100, 20, LIGHTGRAY);
-    // DrawText(TextFormat("ball two velocity Y: %f", playerTwo.vol.y), 10, 130, 20, LIGHTGRAY);
+    DrawText(TextFormat("direction X: %f", playerOne.body.direction.x), 10, 100, 20, LIGHTGRAY);
+    DrawText(TextFormat("direction Y: %f", playerOne.body.direction.y), 10, 130, 20, LIGHTGRAY);
     if (winner != 0) {
       DrawText(TextFormat("PLAYER %d WINS", winner), 80, 350, 80, LIGHTGRAY);
     }
@@ -178,12 +159,12 @@ int main(void) {
   return 0;
 }
 
-void updatePlayer(float delta, sumo* player) {
-  // add ball on ball collision
-  if ((player->pos.x + player->r) > 800 || (player->pos.x - player->r) < 0) {
+void updatePlayer(float delta, ball* player) {
+  // updateMainCircle
+  if ((player->realPos.x + player->r) > 800 || (player->realPos.x - player->r) < 0) {
     player->vol.x *= -1;
   }
-  if ((player->pos.y + player->r) > 800 || (player->pos.y - player->r) < 0) {
+  if ((player->realPos.y + player->r) > 800 || (player->realPos.y - player->r) < 0) {
     player->vol.y *= -1;
   }
   player->vol = Vector2Add(player->vol, (Vector2){player->accel.x * delta, player->accel.y * delta});
@@ -204,11 +185,28 @@ void updatePlayer(float delta, sumo* player) {
   player->accel = (Vector2){0.0, 0.0};
 }
 
-void ballCrash(sumo* a, sumo* b) {
-  float fDistance = Vector2Distance(a->pos, b->pos);
+void ballCrash(ball* a, ball* b) {
+  // Static collision
+  //  Distance between ball centers
+  float fDistance = Vector2Distance(a->realPos, b->realPos);
+
+  // Calculate displacement required
+  float fOverlap = 0.5f * (fDistance - a->r - b->r);
+
+  // Displace Current Ball away from collision
+  a->realPos.x -= fOverlap * (a->realPos.x - b->realPos.x) / fDistance;
+  a->realPos.y -= fOverlap * (a->realPos.y - b->realPos.y) / fDistance;
+
+  // Displace Target Ball away from collision
+  b->realPos.x += fOverlap * (a->realPos.x - b->realPos.x) / fDistance;
+  b->realPos.y += fOverlap * (a->realPos.y - b->realPos.y) / fDistance;
+
+  // dynamic collison
+  // float fDistance = Vector2Distance(a->realPos, b->realPos);
   // Normal
-  float nx = (b->pos.x - a->pos.x) / fDistance;
-  float ny = (b->pos.y - a->pos.y) / fDistance;
+
+  float nx = (b->realPos.x - a->realPos.x) / fDistance;
+  float ny = (b->realPos.y - a->realPos.y) / fDistance;
 
   float kx = (a->vol.x - b->vol.x);
   float ky = (a->vol.y - b->vol.y);
@@ -221,59 +219,97 @@ void ballCrash(sumo* a, sumo* b) {
 
 void playerInputs() {
   if (IsKeyDown(KEY_S)) {
-    playerOne.accel.x = -ACCELARATION;
+    playerOne.body.accel.x = -ACCELARATION;
   }
   if (IsKeyDown(KEY_F)) {
-    playerOne.accel.x = ACCELARATION;
+    playerOne.body.accel.x = ACCELARATION;
   }
   if (IsKeyDown(KEY_E)) {
-    playerOne.accel.y = -ACCELARATION;
+    playerOne.body.accel.y = -ACCELARATION;
   }
   if (IsKeyDown(KEY_D)) {
-    playerOne.accel.y = ACCELARATION;
+    playerOne.body.accel.y = ACCELARATION;
   }
   if (IsKeyDown(KEY_SPACE) && playerOne.slapping == false) {
-    fistPlayerOne.accel = Vector2Scale(punchVector, 40.0);
-    tempPuchVol = fistPlayerOne.accel;
+    playerOne.fistL.accel = Vector2Scale(playerOne.fistL.direction, 40.0);
+    playerOne.fistR.accel = Vector2Scale(playerOne.fistR.direction, 40.0);
     playerOne.slapping = true;
     slapStartTime = gameTime;
   }
 }
+
 void cpuInputs() {
   if (GetRandomValue(0, 100) > 50) {
     return;
   }
-  if (playerOne.pos.x < playerTwo.pos.x) {
-    playerTwo.accel.x = -ACCELARATION;
+  if (playerOne.body.realPos.x < playerTwo.body.realPos.x) {
+    playerTwo.body.accel.x = -ACCELARATION;
   }
-  if (playerOne.pos.x > playerTwo.pos.x) {
-    playerTwo.accel.x = ACCELARATION;
+  if (playerOne.body.realPos.x > playerTwo.body.realPos.x) {
+    playerTwo.body.accel.x = ACCELARATION;
   }
-  if (playerOne.pos.y < playerTwo.pos.y) {
-    playerTwo.accel.y = -ACCELARATION;
+  if (playerOne.body.realPos.y < playerTwo.body.realPos.y) {
+    playerTwo.body.accel.y = -ACCELARATION;
   }
-  if (playerOne.pos.y > playerTwo.pos.y) {
-    playerTwo.accel.y = ACCELARATION;
+  if (playerOne.body.realPos.y > playerTwo.body.realPos.y) {
+    playerTwo.body.accel.y = ACCELARATION;
   }
 }
+
 void fistInputs() {
   if (playerOne.slapping == false) {
-    if (fistGetToo.x < fistPlayerOne.pos.x) {
-      fistPlayerOne.accel.x = -FIST_ACCELARATION;
+    if (playerOne.fistL.homePos.x < playerOne.fistL.realPos.x) {
+      playerOne.fistL.accel.x = -FIST_ACCELARATION;
     }
-    if (fistGetToo.x > fistPlayerOne.pos.x) {
-      fistPlayerOne.accel.x = FIST_ACCELARATION;
+    if (playerOne.fistL.homePos.x > playerOne.fistL.realPos.x) {
+      playerOne.fistL.accel.x = FIST_ACCELARATION;
     }
-    if (fistGetToo.y < fistPlayerOne.pos.y) {
-      fistPlayerOne.accel.y = -FIST_ACCELARATION;
+    if (playerOne.fistL.homePos.y < playerOne.fistL.realPos.y) {
+      playerOne.fistL.accel.y = -FIST_ACCELARATION;
     }
-    if (fistGetToo.y > fistPlayerOne.pos.y) {
-      fistPlayerOne.accel.y = FIST_ACCELARATION;
+    if (playerOne.fistL.homePos.y > playerOne.fistL.realPos.y) {
+      playerOne.fistL.accel.y = FIST_ACCELARATION;
+    }
+
+    if (playerOne.fistR.homePos.x < playerOne.fistR.realPos.x) {
+      playerOne.fistR.accel.x = -FIST_ACCELARATION;
+    }
+    if (playerOne.fistR.homePos.x > playerOne.fistR.realPos.x) {
+      playerOne.fistR.accel.x = FIST_ACCELARATION;
+    }
+    if (playerOne.fistR.homePos.y < playerOne.fistR.realPos.y) {
+      playerOne.fistR.accel.y = -FIST_ACCELARATION;
+    }
+    if (playerOne.fistR.homePos.y > playerOne.fistR.realPos.y) {
+      playerOne.fistR.accel.y = FIST_ACCELARATION;
     }
   } else {
     if (gameTime > (slapStartTime + 0.2)) {
       playerOne.slapping = false;
     }
-    fistPlayerOne.accel = Vector2Scale(punchVector, 40.0);
+    playerOne.fistL.accel = Vector2Scale(playerOne.fistL.direction, 40.0);
+    playerOne.fistR.accel = Vector2Scale(playerOne.fistR.direction, 40.0);
   }
+}
+
+void fistUpdate(sumo* a) {
+  Vector2 distanceToTarget = Vector2Subtract(playerTwo.body.realPos, a->body.realPos);
+  float angleToTarget = atan(-distanceToTarget.y / distanceToTarget.x);
+  float fistAngleL = angleToTarget + 0.785398;
+  float fistAngleR = angleToTarget - 0.785398;
+
+  if (distanceToTarget.x < 0) {
+    a->fistL.direction = (Vector2){-(a->body.r * cos(angleToTarget)), (a->body.r * sin(angleToTarget))};
+    a->fistR.direction = a->fistL.direction;
+    a->fistL.homePos = (Vector2){-(a->body.r * cos(fistAngleL)), (a->body.r * sin(fistAngleL))};
+    a->fistR.homePos = (Vector2){-(a->body.r * cos(fistAngleR)), (a->body.r * sin(fistAngleR))};
+  } else {
+    a->fistL.direction = (Vector2){(a->body.r * cos(angleToTarget)), -(a->body.r * sin(angleToTarget))};
+    a->fistR.direction = a->fistL.direction;
+    a->fistL.homePos = (Vector2){(a->body.r * cos(fistAngleL)), -(a->body.r * sin(fistAngleL))};
+    a->fistR.homePos = (Vector2){(a->body.r * cos(fistAngleR)), -(a->body.r * sin(fistAngleR))};
+  }
+  a->body.direction = Vector2Add(a->body.realPos, a->fistL.direction);
+  a->fistL.homePos = Vector2Add(a->body.realPos, a->fistL.homePos);
+  a->fistR.homePos = Vector2Add(a->body.realPos, a->fistR.homePos);
 }
